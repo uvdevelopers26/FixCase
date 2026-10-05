@@ -1,43 +1,87 @@
-// ---------- Junta las vistas definidas en cada módulo ----------
+/* ============================================================
+   FixCase — Control Principal (app.js)
+   ============================================================ */
+
+// 1. Manejo seguro de elementos del DOM
+function getEl(id) {
+  return document.getElementById(id);
+}
+
+// 2. Mapeo global de vistas blindado contra 'undefined'
 const VIEWS = {
-  usuarios: usuariosView,
-  activos: activosView,
-  tareas: tareasView,
-  plantillas: plantillasView,
+  dashboard: typeof dashboardView !== 'undefined' ? dashboardView : null,
+  usuarios: typeof usuariosView !== 'undefined' ? usuariosView : null,
+  activos: typeof activosView !== 'undefined' ? activosView : null,
+  dhv: typeof dhvView !== 'undefined' ? dhvView : null,
+  tareas: typeof tareasView !== 'undefined' ? tareasView : null,
+  checklists: typeof checklistsView !== 'undefined' ? checklistsView : null,
+  plantillas: typeof plantillasView !== 'undefined' ? plantillasView : null,
 };
 
-// ---------- Elementos del dashboard ----------
-const loginScreen = document.getElementById('login-screen');
-const appScreen = document.getElementById('app-screen');
-const viewTitle = document.getElementById('view-title');
-const viewSub = document.getElementById('view-sub');
-const viewBody = document.getElementById('view-body');
-const viewToolbar = document.getElementById('view-toolbar');
-const navItems = document.querySelectorAll('.nav-item[data-view]');
+let currentViewKey = 'dashboard';
 
-let currentViewKey = 'usuarios';
-
-// ---------- Cambio de pantalla (login <-> dashboard) ----------
+// 3. Control de pantallas (Login <-> Dashboard)
 function showApp() {
-  loginScreen.style.display = 'none';
-  appScreen.style.display = 'block';
-  currentViewKey = 'usuarios';
+  const loginScreen = getEl('login-screen');
+  const appScreen = getEl('app-screen');
+
+  if (loginScreen) loginScreen.style.display = 'none';
+  if (appScreen) appScreen.style.display = 'block';
+
+  document.querySelectorAll('.menu .nav-item').forEach(item => item.classList.remove('active'));
+  const activeBtn = document.querySelector(`.nav-item[data-view="${currentViewKey}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
   loadView(currentViewKey);
 }
 
 function showLogin() {
-  appScreen.style.display = 'none';
-  loginScreen.style.display = 'flex';
-  document.getElementById('login-form').reset();
+  const loginScreen = getEl('login-screen');
+  const appScreen = getEl('app-screen');
+
+  if (appScreen) appScreen.style.display = 'none';
+  if (loginScreen) loginScreen.style.display = 'flex';
+  
+  const loginForm = getEl('login-form');
+  if (loginForm) loginForm.reset();
 }
 
-// ---------- Carga y muestra los datos de una vista ----------
+// 4. Cargar y renderizar vistas
 async function loadView(viewKey) {
   const view = VIEWS[viewKey];
-  viewTitle.textContent = view.title;
-  viewSub.textContent = view.sub;
-  viewBody.innerHTML = '<div class="empty-state">Cargando...</div>';
-  viewToolbar.style.display = view.columns ? 'flex' : 'none';
+  const viewTitle = getEl('view-title');
+  const viewSub = getEl('view-sub');
+  const viewBody = getEl('view-body');
+  const viewToolbar = getEl('view-toolbar');
+
+  if (!view) {
+    console.warn(`La vista "${viewKey}" no está definida o no fue cargada.`);
+    if (viewTitle) viewTitle.textContent = 'Módulo no disponible';
+    if (viewSub) viewSub.textContent = '';
+    if (viewToolbar) viewToolbar.style.display = 'none';
+    if (viewBody) {
+      viewBody.innerHTML = `
+        <div class="panel">
+          <p>El módulo <strong>${escapeHtml(viewKey)}</strong> no se encuentra disponible actualmente.</p>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  if (viewTitle) viewTitle.textContent = view.title || 'Sección';
+  if (viewSub) viewSub.textContent = view.sub || '';
+
+  // CASO 1: Vistas dinámicas con función render propia (ej: Dashboard)
+  if (typeof view.render === 'function') {
+    if (viewToolbar) viewToolbar.style.display = 'none';
+    await view.render(viewBody);
+    return;
+  }
+
+  // CASO 2: Vistas basadas en tablas estándar
+  if (viewBody) viewBody.innerHTML = '<div class="empty-state">Cargando...</div>';
+  if (viewToolbar) viewToolbar.style.display = view.columns ? 'flex' : 'none';
 
   try {
     const res = await fetch(`${API_BASE}${view.endpoint}`, {
@@ -52,27 +96,58 @@ async function loadView(viewKey) {
     if (!res.ok) throw new Error('Error al cargar los datos.');
 
     const data = await res.json();
-    viewBody.innerHTML = view.columns
-      ? renderTable(data, view.columns)
-      : `<div class="empty-state">${escapeHtml(JSON.stringify(data, null, 2))}</div>`;
+    if (viewBody) {
+      viewBody.innerHTML = view.columns
+        ? renderTable(data, view.columns)
+        : `<div class="empty-state">${escapeHtml(JSON.stringify(data, null, 2))}</div>`;
+    }
   } catch (err) {
-    viewBody.innerHTML = `<div class="empty-state">No se pudieron cargar los datos: ${escapeHtml(err.message)}</div>`;
+    if (viewBody) {
+      viewBody.innerHTML = `<div class="empty-state">No se pudieron cargar los datos: ${escapeHtml(err.message)}</div>`;
+    }
   }
 }
 
-// ---------- Navegación entre vistas (clic en el sidebar) ----------
-navItems.forEach(btn => {
+// 5. Configuración del Modo Oscuro
+const THEME_STORAGE_KEY = 'fixcase_theme';
+const themeToggle = getEl('theme-toggle');
+
+function applyTheme(theme) {
+  if (!themeToggle) return;
+  const isDark = theme === 'dark';
+  document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+  themeToggle.setAttribute('aria-pressed', String(isDark));
+  
+  const themeIcon = themeToggle.querySelector('.material-symbols-outlined');
+  const themeLabel = themeToggle.querySelector('.theme-label');
+  const themeState = themeToggle.querySelector('.theme-state');
+
+  if (themeIcon) themeIcon.textContent = isDark ? 'light_mode' : 'dark_mode';
+  if (themeLabel) themeLabel.textContent = isDark ? 'Modo claro' : 'Modo oscuro';
+  if (themeState) themeState.textContent = isDark ? 'OSCURO' : 'CLARO';
+}
+
+if (themeToggle) {
+  applyTheme(localStorage.getItem(THEME_STORAGE_KEY) || 'light');
+  themeToggle.addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    applyTheme(nextTheme);
+  });
+}
+
+// 6. Navegación del Menú Lateral
+document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
   btn.addEventListener('click', () => {
-    navItems.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.menu .nav-item').forEach(item => item.classList.remove('active'));
     btn.classList.add('active');
     currentViewKey = btn.dataset.view;
     loadView(currentViewKey);
   });
 });
 
-// ---------- Arranque ----------
-// Si ya hay una sesión guardada, entra directo al dashboard; si no, login.
-if (getToken()) {
+// 7. Arranque
+if (typeof getToken === 'function' && getToken()) {
   showApp();
 } else {
   showLogin();

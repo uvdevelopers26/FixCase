@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiTick — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MiTick — Design System (tokens reales del proyecto)
+   ============================================================ */
+:root {
+  --bg: #F6F9F8;
+  --surface: #FFFFFF;
+  --ink: #10262B;
+  --ink-soft: #5B6B6A;
+  --accent: #7BBDE8;
+  --accent-strong: #3EA1C9;
+  --accent-soft: #E4F0EC;
+  --warn: #C2452A;
+  --warn-soft: #FBEAE5;
+  --border: #3ea1c9;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .brand { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }
+
+/* ---------- Layout shell (reutilizado del sistema real) ---------- */
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+.sidebar {
+  background: var(--ink);
+  color: white;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar .brand { font-size: 16px; font-weight: 700; color: white; margin-bottom: 2px; }
+.sidebar .brand-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin-bottom: 28px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  background: none; border: none;
+  color: rgba(255,255,255,0.75);
+  font-family: inherit; font-size: 14px;
+  padding: 10px 12px; border-radius: 8px;
+  cursor: pointer; margin-bottom: 4px;
+}
+.nav-item:hover { background: rgba(255,255,255,0.08); color: white; }
+.nav-item.active { background: var(--accent); color: var(--ink); font-weight: 600; }
+.nav-item .ic { width: 16px; text-align: center; font-size: 14px; }
+.sidebar .spacer { flex: 1; }
+.nav-item.logout { color: rgba(255,255,255,0.5); font-size: 13px; }
+
+.content { padding: 28px 36px 48px; }
+.content h2 { font-size: 22px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+.content .view-sub { color: var(--ink-soft); font-size: 13px; margin: 0 0 24px; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+/* ============================================================
+   Dashboard — piezas nuevas
+   ============================================================ */
+
+/* Barra de filtros */
+.filters-panel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto auto;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+.filters-panel .field label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em;
+  margin-bottom: 6px;
+}
+.filters-panel select, .filters-panel input[type="date"] {
+  width: 100%; padding: 9px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-family: inherit; font-size: 13px;
+  background: var(--bg); color: var(--ink);
+}
+.filters-panel select:focus, .filters-panel input:focus { outline: none; border-color: var(--accent-strong); }
+.btn-search {
+  padding: 9px 18px; border: none; border-radius: 8px;
+  background: var(--accent); color: var(--ink);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.btn-search:hover { background: var(--accent-strong); color: white; }
+
+/* KPI cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+}
+.kpi-icon {
+  width: 46px; height: 46px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.kpi-icon.tone-accent { background: var(--accent-soft); color: var(--accent-strong); }
+.kpi-icon.tone-warn   { background: var(--warn-soft);   color: var(--warn); }
+.kpi-icon.tone-ink    { background: #E7ECEB;             color: var(--ink); }
+.kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; line-height: 1.1; }
+.kpi-label { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+
+/* Cumplimiento preventivo */
+.compliance-panel { margin-bottom: 20px; }
+.compliance-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.compliance-head .big { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: var(--accent-strong); }
+.compliance-head .sub { font-size: 13px; color: var(--ink-soft); }
+.compliance-pct { color: #2E8B57; font-weight: 600; font-size: 13px; margin-bottom: 18px; }
+
+.progress-row { margin-bottom: 14px; }
+.progress-row:last-child { margin-bottom: 0; }
+.progress-row .plabel { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.progress-row .plabel .name { color: var(--ink); font-weight: 500; }
+.progress-row .plabel .pct { color: var(--ink-soft); }
+.progress-track { height: 8px; border-radius: 999px; background: #E7ECEB; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 999px; background: var(--accent); }
+
+/* Gráficas donut */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-panel h3 {
+  color: var(--accent-strong); font-size: 16px; margin: 0 0 18px;
+}
+.chart-body { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.donut {
+  width: 190px; height: 190px; border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.donut::after {
+  content: ""; position: absolute; inset: 30px;
+  background: var(--surface); border-radius: 50%;
+}
+.donut-center {
+  position: relative; z-index: 1; text-align: center;
+}
+.donut-center .n { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; }
+.donut-center .l { font-size: 10.5px; color: var(--ink-soft); }
+
+.legend { display: flex; flex-direction: column; gap: 9px; flex: 1; min-width: 180px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink); }
+.legend-item .swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-item .pct { margin-left: auto; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .filters-panel { grid-template-columns: 1fr 1fr; }
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="brand">MiTick</div>
+    <div class="brand-sub">Unión Vital · Sistemas</div>
+
+    <button class="nav-item active"><span class="ic">◆</span> Dashboard</button>
+    <button class="nav-item"><span class="ic">▣</span> Activos</button>
+    <button class="nav-item"><span class="ic">▤</span> Hojas de Vida</button>
+    <button class="nav-item"><span class="ic">✓</span> Tareas</button>
+    <button class="nav-item"><span class="ic">▦</span> Plantillas</button>
+    <button class="nav-item"><span class="ic">☑</span> Checklists</button>
+    <button class="nav-item"><span class="ic">◐</span> Usuarios</button>
+
+    <div class="spacer"></div>
+    <button class="nav-item logout">⏻ Cerrar sesión</button>
+  </aside>
+
+  <!-- ===================== CONTENT ===================== -->
+  <main class="content">
+    <h2>📊 Dashboard</h2>
+    <p class="view-sub">Vista general de activos, tareas y mantenimientos preventivos</p>
+
+    <!-- Filtros -->
+    <div class="panel filters-panel">
+      <div class="field">
+        <label>Categoría de activo</label>
+        <select>
+          <option>Todo</option>
+          <option>Desktop</option>
+          <option>Laptop</option>
+          <option>Biomédico</option>
+          <option>Impresora</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sede</label>
+        <select><option>Todo</option><option>Principal</option></select>
+      </div>
+      <div class="field">
+        <label>Área</label>
+        <select><option>Todo</option><option>Sistemas</option></select>
+      </div>
+      <div class="field">
+        <label>Estado de tarea</label>
+        <select><option>Todo</option><option>Pendiente</option><option>Completada</option></select>
+      </div>
+      <div class="field">
+        <label>Desde</label>
+        <input type="date" value="2026-01-01">
+      </div>
+      <button class="btn-search">Buscar</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon tone-accent">▣</div>
+        <div><div class="kpi-value">312</div><div class="kpi-label">Activos registrados</div></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon tone-warn">✎</div>
+        <div><div class="kpi-value">47</div><div class="kpi-label">Tareas pendientes</div></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon tone-accent">✓</div>
+        <div><div class="kpi-value">861</div><div class="kpi-label">Tareas completadas</div></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon tone-ink">☑</div>
+        <div><div class="kpi-value">9</div><div class="kpi-label">Checklists vencidos</div></div>
+      </div>
+    </div>
+
+    <!-- Cumplimiento preventivo -->
+    <div class="panel compliance-panel">
+      <div class="compliance-head">
+        <span class="big">Preventivo 214 / 305</span>
+        <span class="sub">Cumplimiento mantenimientos preventivos</span>
+      </div>
+      <div class="compliance-pct">70% en el rango seleccionado</div>
+
+      <div class="progress-row">
+        <div class="plabel"><span class="name">Infraestructura</span><span class="pct">66%</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:66%"></div></div>
+      </div>
+      <div class="progress-row">
+        <div class="plabel"><span class="name">Equipos Biomédicos</span><span class="pct">80%</span></div>
+        <div class="progress-track"><div class="progress-fill" style="width:80%; background:var(--accent-strong);"></div></div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="panel chart-panel">
+        <h3>Tareas por prioridad</h3>
+        <div class="chart-body">
+          <div class="donut" id="donut-priority">
+            <div class="donut-center"><div class="n">368</div><div class="l">tareas</div></div>
+          </div>
+          <div class="legend" id="legend-priority"></div>
+        </div>
+      </div>
+
+      <div class="panel chart-panel">
+        <h3>Activos por categoría</h3>
+        <div class="chart-body">
+          <div class="donut" id="donut-category">
+            <div class="donut-center"><div class="n">312</div><div class="l">activos</div></div>
+          </div>
+          <div class="legend" id="legend-category"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   Donuts en CSS puro (conic-gradient) — sin dependencias externas
+   ============================================================ */
+function renderDonut(elId, legendId, data) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  let acc = 0;
+  const stops = data.map(d => {
+    const start = (acc / total) * 360;
+    acc += d.value;
+    const end = (acc / total) * 360;
+    return `${d.color} ${start}deg ${end}deg`;
+  }).join(", ");
+
+  document.getElementById(elId).style.background = `conic-gradient(${stops})`;
+
+  const legend = document.getElementById(legendId);
+  legend.innerHTML = data.map(d => {
+    const pct = Math.round((d.value / total) * 100);
+    return `<div class="legend-item">
+      <span class="swatch" style="background:${d.color}"></span>
+      <span>${d.label}</span>
+      <span class="pct">${pct}%</span>
+    </div>`;
+  }).join("");
+}
+
+// Paleta tonal derivada de la marca (accent → border → ink), no arcoíris genérico
+const TONAL = ["#7BBDE8", "#5FA8D6", "#3EA1C9", "#2E7BA6", "#245A78",
+               "#5B6B6A", "#3D4A49", "#10262B", "#8FA3A1", "#C2452A", "#E0A030"];
+
+renderDonut("donut-priority", "legend-priority", [
+  { label: "Alta",  value: 195, color: "#3EA1C9" },
+  { label: "Media", value: 92,  color: "#7BBDE8" },
+  { label: "Baja",  value: 54,  color: "#5B6B6A" },
+  { label: "Urgente", value: 27, color: "#C2452A" }
+]);
+
+renderDonut("donut-category", "legend-category", [
+  { label: "Desktop",            value: 78, color: TONAL[0] },
+  { label: "Laptop",             value: 61, color: TONAL[1] },
+  { label: "Biomédico",          value: 44, color: TONAL[2] },
+  { label: "Impresora láser",    value: 31, color: TONAL[3] },
+  { label: "Servidor",           value: 18, color: TONAL[4] },
+  { label: "Redes",              value: 27, color: TONAL[5] },
+  { label: "Software",           value: 22, color: TONAL[6] },
+  { label: "Telefonía",          value: 15, color: TONAL[7] },
+  { label: "AIO",                value: 9,  color: TONAL[8] },
+  { label: "Impresora factura",  value: 5,  color: TONAL[9] },
+  { label: "Impresora código",   value: 2,  color: TONAL[10] }
+]);
+</script>
+</body>
+</html>

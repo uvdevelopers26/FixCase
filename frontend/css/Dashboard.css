@@ -1,0 +1,196 @@
+/* ============================================================
+   FixCase — Estilos del Dashboard
+   Pegar AL FINAL de css/styles.css (antes del @media de 760px
+   o después, da igual). Usa las variables ya definidas en :root.
+   ============================================================ */
+
+/* ---------- Filtros ---------- */
+.filters-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.filters-panel .field {
+  margin-bottom: 0;
+  min-width: 160px;
+  flex: 1 1 160px;
+}
+.field select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--ink);
+}
+.field select:focus,
+.field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.field input[type="date"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--ink);
+}
+.btn-search {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-button);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 41px;
+}
+.btn-search:hover { filter: brightness(1.08); }
+
+/* ---------- KPIs ---------- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.kpi-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.kpi-icon .material-symbols-outlined { font-size: 24px; }
+.kpi-icon.tone-accent { background: var(--accent-soft); color: var(--accent); }
+.kpi-icon.tone-warn   { background: var(--warn-soft);   color: var(--warn); }
+.kpi-icon.tone-ink    { background: var(--bg); color: var(--ink); border: 1px solid var(--border); }
+.kpi-value {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+}
+.kpi-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* ---------- Gráficos (donas) ---------- */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.chart-panel h3 { margin: 0 0 16px; font-size: 16px; }
+.chart-body {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.donut {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.donut::after {               /* agujero central */
+  content: "";
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  z-index: 1;                 /* por encima del agujero */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.donut-center .n {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+.donut-center .l { font-size: 11px; color: var(--ink-soft); }
+
+.legend { display: grid; gap: 8px; font-size: 13px; }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-item .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.legend-item .pct { margin-left: auto; padding-left: 14px; color: var(--ink-soft); font-weight: 600; }
+
+/* ---------- Cumplimiento preventivo ---------- */
+.compliance-panel h3 { margin: 0; font-size: 16px; }
+.compliance-head .big {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+.compliance-pct { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.progress-row { margin-bottom: 12px; }
+.progress-row .plabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.progress-row .plabel .pct { color: var(--ink-soft); font-weight: 600; }
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-button);
+  transition: width 400ms ease;
+}
+
+/* ---------- Línea de pulso del login (si usas el bloque pulse-wrap) ---------- */
+.pulse-wrap { display: flex; justify-content: center; margin-bottom: 6px; }
+.pulse-wrap svg { width: 120px; height: 32px; }
+.pulse-line {
+  fill: none;
+  stroke: var(--accent-button);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

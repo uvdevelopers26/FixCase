@@ -51,6 +51,7 @@ def create_app():
     from app.routes.checklists import checklists_bp
     from app.routes.dhv import dhv_bp
     from app.routes.dhv_archivos import dhv_archivos_bp
+    from app.routes.dashboard import dashboard_bp
 
     # ==========================
     # Registrar Blueprints
@@ -63,6 +64,7 @@ def create_app():
     app.register_blueprint(checklists_bp)
     app.register_blueprint(dhv_bp)
     app.register_blueprint(dhv_archivos_bp)
+    app.register_blueprint(dashboard_bp)
 
     # ==========================
     # Endpoint de prueba

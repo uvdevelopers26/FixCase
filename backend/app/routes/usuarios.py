@@ -48,12 +48,13 @@ def get_usuario(id):
 @usuarios_bp.route("/", methods=["POST"])
 def crear_usuario():
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     clave = data.get("clave")
 
     if not clave:
         return jsonify({
+            "ok": False,
             "error": "La contraseña es obligatoria"
         }), 400
 
@@ -70,19 +71,20 @@ def crear_usuario():
         rol=data.get("rol"),
         user=data.get("user"),
         clave=clave_hash,
-        id_activo=data.get("id_activo")
+        id_activo=data.get("id_activo"),
+        estado=data.get("estado", True)
     )
 
     db.session.add(nuevo)
     db.session.commit()
 
-    return jsonify(
-        nuevo.to_dict()
-    ), 201
+    res = nuevo.to_dict()
+    res["ok"] = True
+    return jsonify(res), 201
 
 
 # ==========================================================
-# ACTUALIZAR USUARIO
+# ACTUALIZAR USUARIO (EDITAR)
 # ==========================================================
 
 @usuarios_bp.route("/<int:id>", methods=["PUT"])
@@ -90,7 +92,7 @@ def actualizar_usuario(id):
 
     usuario = Usuario.query.get_or_404(id)
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     usuario.rol = data.get(
         "rol",
@@ -107,22 +109,53 @@ def actualizar_usuario(id):
         usuario.id_activo
     )
 
+    if "estado" in data:
+        usuario.estado = bool(data["estado"])
+
     # ------------------------------------------------------
-    # Si viene una nueva contraseña, generar BCrypt
+    # Si viene una nueva contraseña y no está vacía, generar BCrypt
     # ------------------------------------------------------
 
-    if data.get("clave"):
+    clave = data.get("clave")
+    if clave and clave.strip() != "":
         clave_hash = bcrypt.hashpw(
-            data["clave"].encode("utf-8"),
+            clave.encode("utf-8"),
             bcrypt.gensalt()
         ).decode("utf-8")
         usuario.clave = clave_hash
 
     db.session.commit()
 
-    return jsonify(
-        usuario.to_dict()
-    )
+    res = usuario.to_dict()
+    res["ok"] = True
+    return jsonify(res)
+
+
+# ==========================================================
+# CAMBIAR ESTADO (INACTIVAR / ACTIVAR)
+# ==========================================================
+
+@usuarios_bp.route("/<int:id>/estado", methods=["PATCH"])
+def cambiar_estado_usuario(id):
+
+    usuario = Usuario.query.get_or_404(id)
+
+    data = request.get_json() or {}
+
+    if "estado" in data:
+        usuario.estado = bool(data["estado"])
+    else:
+        # Si no viene el valor, invierte el estado actual
+        usuario.estado = not getattr(usuario, "estado", True)
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "mensaje": "Estado actualizado correctamente",
+        "usuario": usuario.to_dict()
+    })
+
 
 # ==========================================================
 # ELIMINAR USUARIO
@@ -136,4 +169,7 @@ def eliminar_usuario(id):
     db.session.delete(usuario)
     db.session.commit()
 
-    return "", 204
+    return jsonify({
+        "ok": True,
+        "mensaje": "Usuario eliminado correctamente"
+    }), 200

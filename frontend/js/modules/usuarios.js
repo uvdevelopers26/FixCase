@@ -21,19 +21,25 @@ const usuariosView = {
         </span>
       `
     },
-    { key: 'creado_en', label: 'Creado', render: formatFecha },
+    { key: 'creado_en', label: 'Creado', render: typeof formatFecha === 'function' ? formatFecha : (val) => val || '—' },
     {
       key: 'acciones',
       label: 'Acciones',
-      render: (_, row) => `
-        <button type="button" class="btn-secondary" onclick="editarUsuario(${row.id})" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
-          <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">edit</span> Editar
-        </button>
-        <button type="button" class="btn-secondary" onclick="toggleEstadoUsuario(${row.id}, ${row.estado})" style="padding: 4px 8px; font-size: 12px; color: ${row.estado ? 'var(--warn)' : '#2E8B57'};">
-          <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">${row.estado ? 'block' : 'check_circle'}</span>
-          ${row.estado ? 'Inactivar' : 'Activar'}
-        </button>
-      `
+      render: (_, row) => {
+        if (!row || typeof row.id === 'undefined') return '—';
+        const id = row.id;
+        const estado = row.estado === true || row.estado === 1;
+
+        return `
+          <button type="button" class="btn-secondary" onclick="editarUsuario(${id})" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
+            <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">edit</span> Editar
+          </button>
+          <button type="button" class="btn-secondary" onclick="toggleEstadoUsuario(${id}, ${estado})" style="padding: 4px 8px; font-size: 12px; color: ${estado ? 'var(--warn)' : '#2E8B57'};">
+            <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">${estado ? 'block' : 'check_circle'}</span>
+            ${estado ? 'Inactivar' : 'Activar'}
+          </button>
+        `;
+      }
     }
   ],
 
@@ -57,9 +63,11 @@ const usuariosView = {
 // FUNCIONES DE EDICIÓN E INACTIVACIÓN
 // ============================================================
 
-// Alternar entre Activo e Inactivo
+// Alternar estado Activo / Inactivo
 async function toggleEstadoUsuario(id, estadoActual) {
+  const nuevoEstado = !estadoActual;
   const accion = estadoActual ? 'inactivar' : 'activar';
+
   if (!confirm(`¿Estás seguro de que deseas ${accion} este usuario?`)) return;
 
   try {
@@ -69,54 +77,67 @@ async function toggleEstadoUsuario(id, estadoActual) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getToken()}`
       },
-      body: JSON.stringify({ estado: !estadoActual })
+      body: JSON.stringify({ estado: nuevoEstado })
     });
 
     const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || 'No se pudo cambiar el estado.');
 
-    // Recargar la tabla de usuarios
+    if (!res.ok || (data.ok !== undefined && !data.ok)) {
+      throw new Error(data.error || `No se pudo ${accion} el usuario.`);
+    }
+
+    // Recargar la vista actual
     if (typeof loadView === 'function') {
       loadView('usuarios');
     }
   } catch (err) {
-    alert(`Error: ${err.message}`);
+    alert(`Error al cambiar estado: ${err.message}`);
   }
 }
 
-// Cargar datos y abrir modal de edición
+// Cargar y abrir modal de edición
 async function editarUsuario(id) {
   try {
     const res = await fetch(`${API_BASE}/usuarios/${id}`, {
-      headers: { 'Authorization': `Bearer ${getToken()}` }
+      headers: {
+        'Authorization': `Bearer ${getToken()}`
+      }
     });
 
-    if (!res.ok) throw new Error('No se pudo obtener la información del usuario.');
+    if (!res.ok) throw new Error('No se pudieron obtener los datos del usuario.');
+
     const usuario = await res.json();
 
-    // Abrir modal con los campos del usuario
+    // Si tu sistema utiliza openModal para renderizar formularios dinámicos
     if (typeof openModal === 'function') {
-      openModal('Editar Usuario', usuariosView.createFields, usuario, async (formData) => {
-        const updateRes = await fetch(`${API_BASE}/usuarios/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getToken()}`
-          },
-          body: JSON.stringify(formData)
-        });
+      openModal({
+        title: 'Editar Usuario',
+        fields: usuariosView.createFields,
+        data: usuario,
+        onSubmit: async (formData) => {
+          const updateRes = await fetch(`${API_BASE}/usuarios/${id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify(formData)
+          });
 
-        const updateData = await updateRes.json();
-        if (!updateRes.ok || !updateData.ok) {
-          throw new Error(updateData.error || 'No se pudieron guardar los cambios.');
-        }
+          const updateData = await updateRes.json();
+          if (!updateRes.ok || (updateData.ok !== undefined && !updateData.ok)) {
+            throw new Error(updateData.error || 'No se pudieron guardar los cambios.');
+          }
 
-        if (typeof loadView === 'function') {
-          loadView('usuarios');
+          if (typeof loadView === 'function') {
+            loadView('usuarios');
+          }
         }
       });
+    } else {
+      alert('La función modal (openModal) no está disponible.');
     }
   } catch (err) {
-    alert(`Error: ${err.message}`);
+    alert(`Error al abrir edición: ${err.message}`);
   }
 }

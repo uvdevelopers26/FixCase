@@ -71,10 +71,12 @@ async function loadView(viewKey) {
 
   if (viewTitle) viewTitle.textContent = view.title || 'Sección';
   if (viewSub) viewSub.textContent = view.sub || '';
+  const newButton = getEl('btn-new');
+  if (newButton) newButton.textContent = view.newLabel || '+ Nuevo';
 
   // CASO 1: Vistas dinámicas con función render propia (ej: Dashboard)
   if (typeof view.render === 'function') {
-    if (viewToolbar) viewToolbar.style.display = 'none';
+    if (viewToolbar) viewToolbar.style.display = view.createFields ? 'flex' : 'none';
     await view.render(viewBody);
     return;
   }

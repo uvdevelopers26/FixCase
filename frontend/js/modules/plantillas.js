@@ -1,39 +1,17 @@
 const plantillasView = {
-  title: 'Plantillas de Checklist',
-  sub: 'Configuración de listas de chequeo por tipo de equipo y mantenimiento.',
-  endpoint: '/checklists/plantillas',
-  columns: [
-    { key: 'id', label: 'ID' },
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'perfil_activo', label: 'Perfil' },
-    { key: 'categoria_mantenimiento', label: 'Tipo Mantenimiento' },
-    {
-        key: 'items',
-        label: 'Items',
-        render: (val) => val ? `<span class="badge neutral">${val.length} puntos</span>` : '0'
-    }
-  ],
-  createFields: [
-    { key: 'nombre', label: 'Nombre de la Plantilla', type: 'text', required: true, full: true },
-    { key: 'perfil_activo', label: 'Perfil del Activo', type: 'select', required: true,
-      // Mismos valores exactos que asunto_grupo en tareas.js — tienen que coincidir
-      // carácter por carácter para que el matching automático funcione.
-      options: [
-        { value: 'AIO', label: '🖥️ Todo en Uno' },
-        { value: 'SOFTWARE', label: '💿 Software / Aplicativo' },
-        { value: 'IMPRESORA', label: '🖨️ Impresora' },
-        { value: 'PORTATIL', label: '💻 Portátil / Laptop' },
-        { value: 'TELEVISOR', label: '📺 Televisor' }
-      ]
-    },
-    { key: 'categoria_mantenimiento', label: 'Categoría', type: 'select', required: true,
-      // Mismos valores exactos que categoria_mantenimiento en tareas.js
-      options: [
-        { value: 'Preventivo', label: '🛠️ Mantenimiento Preventivo' },
-        { value: 'Correctivo', label: '🚨 Mantenimiento Correctivo' },
-        { value: 'Reinstalacion', label: '📦 Reinstalación / Cambio' }
-      ]
-    },
-    { key: 'descripcion', label: 'Descripción breve', type: 'text', full: true }
-  ],
+ title:'Plantillas de Checklist', sub:'Modelos reutilizables para los mantenimientos de tus activos.', endpoint:'/checklists/plantillas', createFields:[], newLabel:'+ Nueva plantilla', openNew:()=>plantillasModule.openEditor(),
+ render:async function(container){
+  container.innerHTML=`<section class="templates-browser"><div class="template-filters"><label class="templates-search-wrap"><span class="material-symbols-outlined">search</span><input class="templates-search" id="templates-search" type="search" placeholder="Buscar por nombre, categoría o descripción"></label><select id="templates-category"><option value="">Todas las categorías</option></select></div><p class="templates-count" id="templates-count" aria-live="polite"></p><div class="templates-grid" id="templates-grid"><div class="empty-state">Cargando plantillas...</div></div></section>`;
+  const grid=container.querySelector('#templates-grid'),search=container.querySelector('#templates-search'),category=container.querySelector('#templates-category'),count=container.querySelector('#templates-count');
+  try{const templates=await checklistRequest(`${API_BASE}${this.endpoint}`);[...new Set(templates.map(t=>t.categoria_mantenimiento||t.perfil_activo).filter(Boolean))].sort().forEach(c=>category.insertAdjacentHTML('beforeend',`<option>${escapeHtml(c)}</option>`));const draw=()=>{const q=search.value.trim().toLocaleLowerCase('es'),filtered=templates.filter(t=>[t.nombre,t.categoria_mantenimiento,t.perfil_activo,t.descripcion].some(v=>String(v||'').toLocaleLowerCase('es').includes(q))&&(!category.value||(t.categoria_mantenimiento||t.perfil_activo)===category.value));count.textContent=`${filtered.length} de ${templates.length} plantillas`;grid.innerHTML=filtered.length?filtered.map(t=>`<article class="template-card"><div class="template-card-top"><span class="template-card-icon material-symbols-outlined">fact_check</span><span class="template-item-count">${t.items?.length||0} ${(t.items?.length||0)===1?'punto':'puntos'}</span><details class="action-menu"><summary aria-label="Acciones de plantilla">⋯</summary><div><button onclick="plantillasModule.view(${t.id})">Ver plantilla</button><button onclick="plantillasModule.openEditor(${t.id})">Editar</button><button onclick="plantillasModule.duplicate(${t.id})">Duplicar</button>${checklistIsAdmin()?`<button class="danger-action" onclick="plantillasModule.remove(${t.id})">Eliminar</button>`:''}</div></details></div><h3>${escapeHtml(t.nombre)}</h3><p class="template-description">${escapeHtml(t.descripcion||'Sin descripción.')}</p><div class="template-tags"><span class="template-tag"><span class="material-symbols-outlined">category</span>${escapeHtml(t.categoria_mantenimiento||t.perfil_activo||'Sin categoría')}</span></div><button class="btn-new template-use" type="button" onclick="plantillasModule.use(${t.id})"><span class="material-symbols-outlined">add_task</span> Usar plantilla</button></article>`).join(''):`<div class="templates-empty"><span class="material-symbols-outlined">${templates.length?'search_off':'inventory_2'}</span><strong>${templates.length?'No hay coincidencias':'Aún no hay plantillas'}</strong><span>${templates.length?'Cambia la búsqueda o categoría.':'Crea una plantilla para empezar.'}</span></div>`;};search.addEventListener('input',draw);category.addEventListener('change',draw);draw();}catch(e){grid.innerHTML=`<div class="empty-state">${escapeHtml(e.message)}</div>`;}
+ }
 };
+const plantillasModule={
+ view:async function(id){try{const t=await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`);openCustomModal(t.nombre,`<p>${escapeHtml(t.descripcion||'Sin descripción')}</p><p><span class="badge neutral">${escapeHtml(t.categoria_mantenimiento||t.perfil_activo||'Sin categoría')}</span></p><ol class="template-preview">${(t.items||[]).map(i=>`<li>${escapeHtml(i.texto)}</li>`).join('')||'<li>Sin puntos</li>'}</ol>`,null,'Cerrar');}catch(e){alert(e.message);}},
+ use:async function(id){try{const t=await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`);checklistsModule.openCreate(t);}catch(e){alert(e.message);}},
+ openEditor:async function(id=null,seed=null){try{const t=seed||(id?await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`):{nombre:'',descripcion:'',categoria_mantenimiento:'Computador',perfil_activo:'',items:[]});let items=(t.items||[]).map(i=>i.texto);const drawItems=()=>`<div class="template-editor-items" id="template-editor-items">${items.map((text,i)=>`<div class="template-point-row"><span class="template-point-number">${i+1}</span><input type="text" data-point="${i}" value="${escapeHtml(text)}" aria-label="Punto ${i+1}"><button type="button" title="Subir" onclick="window.plantillasModule.move(${i},-1)">↑</button><button type="button" title="Bajar" onclick="window.plantillasModule.move(${i},1)">↓</button><button type="button" class="danger-action" title="Eliminar" onclick="window.plantillasModule.removePoint(${i})">×</button></div>`).join('')}<button type="button" class="btn-secondary" onclick="window.plantillasModule.addPoint()">+ Agregar punto</button></div>`;const redraw=()=>{const el=document.getElementById('template-editor-items');if(el)el.outerHTML=drawItems();};openCustomModal(id?'Editar plantilla':'Nueva plantilla',`<div class="field full"><label for="template-name">Nombre</label><input id="template-name" required value="${escapeHtml(t.nombre)}"></div><div class="field"><label for="template-category">Categoría</label><select id="template-category">${[...new Set([t.categoria_mantenimiento,'Computador','Impresora','Red','Servidor','UPS','Telefonía','Periféricos','Preventivo','Correctivo','Reinstalacion'].filter(Boolean))].map(c=>`<option ${t.categoria_mantenimiento===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="field"><label for="template-profile">Tipo de activo (opcional)</label><input id="template-profile" value="${escapeHtml(t.perfil_activo||'')}"></div><div class="field full"><label for="template-description">Descripción</label><textarea id="template-description" rows="3">${escapeHtml(t.descripcion||'')}</textarea></div><div class="field full"><label>Puntos de revisión</label>${drawItems()}</div>`,async()=>{document.querySelectorAll('[data-point]').forEach(input=>items[Number(input.dataset.point)]=input.value.trim());const payload={nombre:document.getElementById('template-name').value.trim(),categoria_mantenimiento:document.getElementById('template-category').value,perfil_activo:document.getElementById('template-profile').value.trim()||null,descripcion:document.getElementById('template-description').value.trim(),items:items.filter(Boolean).map((texto,orden)=>({texto,orden:orden+1}))};if(!payload.nombre)throw new Error('Escribe el nombre de la plantilla.');if(!payload.items.length)throw new Error('Agrega al menos un punto de revisión.');await checklistRequest(`${API_BASE}/checklists/plantillas${id?`/${id}`:''}`,{method:id?'PUT':'POST',body:JSON.stringify(payload)});closeModal();loadView('plantillas');});window.plantillasModule={...this,addPoint:function(){document.querySelectorAll('[data-point]').forEach(input=>items[Number(input.dataset.point)]=input.value);items.push('');redraw();document.querySelector('[data-point]:last-of-type')?.focus();},removePoint:function(i){document.querySelectorAll('[data-point]').forEach(input=>items[Number(input.dataset.point)]=input.value);items.splice(i,1);redraw();},move:function(i,delta){document.querySelectorAll('[data-point]').forEach(input=>items[Number(input.dataset.point)]=input.value);const j=i+delta;if(j<0||j>=items.length)return;[items[i],items[j]]=[items[j],items[i]];redraw();}};}catch(e){alert(e.message);}},
+ addPoint:function(){},removePoint:function(){},move:function(){},
+ duplicate:async function(id){try{const t=await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`);this.openEditor(null,{...t,nombre:`${t.nombre} (copia)`,items:t.items.map(i=>({...i}))});}catch(e){alert(e.message);}},
+ remove:async function(id){if(!checklistIsAdmin()||!confirm('¿Eliminar esta plantilla? Los checklists ya creados conservan sus puntos.'))return;try{await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`,{method:'DELETE'});loadView('plantillas');}catch(e){alert(e.message);}}
+};
+window.plantillasModule = plantillasModule;

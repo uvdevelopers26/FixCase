@@ -17,6 +17,31 @@ class Usuario(BaseModel):
         nullable=False
     )
 
+    nombres = db.Column(
+        db.String(100),
+        nullable=True
+    )
+
+    apellidos = db.Column(
+        db.String(100),
+        nullable=True
+    )
+
+    email = db.Column(
+        db.String(150),
+        nullable=True
+    )
+
+    telefono = db.Column(
+        db.String(30),
+        nullable=True
+    )
+
+    cargo = db.Column(
+        db.String(100),
+        nullable=True
+    )
+
     user = db.Column(
         db.String(50),
         unique=True,
@@ -62,6 +87,12 @@ class Usuario(BaseModel):
         return {
             "id": self.id,
             "rol": self.rol,
+            "nombres": self.nombres or "",
+            "apellidos": self.apellidos or "",
+            "nombre_completo": f"{self.nombres or ''} {self.apellidos or ''}".strip() or self.user,
+            "email": self.email or "",
+            "telefono": self.telefono or "",
+            "cargo": self.cargo or "",
             "user": self.user,
             "id_activo": self.id_activo,
             "activo": self.activo,

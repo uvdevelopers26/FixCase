@@ -1,148 +1,50 @@
-/**
- * Módulo: Checklists
- * Maneja la lógica de visualización y actualización de las listas de chequeo.
- */
-const checklistsModule = {
-
-  /**
-   * Se llama automáticamente cuando se crea una Tarea desde el modal de Tareas.
-   * Busca la plantilla adecuada, crea la instancia y abre el modal.
-   */
-  iniciarAutomatico: async function(tareaId, perfil, mantenimiento) {
-    try {
-      console.log(`Iniciando auto-checklist para Tarea ${tareaId} (${perfil} - ${mantenimiento})`);
-
-      // 1. Buscar la plantilla que coincida con el equipo y el tipo de trabajo
-      const resMatch = await fetch(`${API_BASE}/checklists/plantillas/buscar-match/?perfil=${encodeURIComponent(perfil)}&mantenimiento=${encodeURIComponent(mantenimiento)}`, {
-        headers: { 'Authorization': `Bearer ${getToken()}` }
-      });
-
-      if (!resMatch.ok) {
-        throw new Error("No se encontró una plantilla específica para este equipo y trabajo.");
-      }
-      const plantilla = await resMatch.json();
-
-      // 2. Crear la instancia (el checklist real) para esta tarea
-      const resInstancia = await fetch(`${API_BASE}/checklists/instancias/desde-plantilla`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({
-          id_tarea: tareaId,
-          id_plantilla: plantilla.id
-        })
-      });
-
-      if (!resInstancia.ok) throw new Error("Error al generar la instancia del checklist.");
-      const nuevaInstancia = await resInstancia.json();
-
-      // 3. Renderizar el modal con el checklist
-      // Usamos un pequeño delay para asegurar que el modal anterior se cerró completamente
-      setTimeout(() => {
-        this.renderizar(nuevaInstancia);
-      }, 400);
-
-    } catch (err) {
-      console.warn("Checklist automático omitido:", err.message);
-      // No bloqueamos al usuario con alertas intrusivas si falla el auto-inicio,
-      // pero dejamos el log para debug.
-    }
-  },
-
-  /**
-   * Abre un checklist ya existente desde la tabla de tareas (botón 📋 Checklist).
-   */
-  abrirParaTarea: async function(tareaId) {
-    try {
-      const res = await fetch(`${API_BASE}/checklists/tareas/${tareaId}/instancias`, {
-        headers: { 'Authorization': `Bearer ${getToken()}` }
-      });
-      const instancias = await res.json();
-
-      if (instancias.length === 0) {
-        alert("Esta tarea no tiene un checklist iniciado. Por favor, asegúrese de que el activo y el tipo de mantenimiento tengan una plantilla configurada.");
-        return;
-      }
-
-      // Renderizamos la instancia más reciente vinculada a la tarea
-      this.renderizar(instancias[0]);
-    } catch (err) {
-      alert("Error al cargar checklist: " + err.message);
-    }
-  },
-
-  /**
-   * Dibuja los ítems del checklist dentro del modal genérico.
-   */
-  renderizar: function(instancia) {
-    const fields = document.getElementById('modal-fields');
-    const title = document.getElementById('modal-title');
-    const sub = document.querySelector('#modal-overlay .modal-sub'); // antes: getElementById('modal-sub'), no existía
-    const submitBtn = document.getElementById('modal-submit');
-
-    title.textContent = "Checklist: " + instancia.nombre;
-    if (sub) sub.textContent = "Marque los puntos completados para esta tarea.";
-
-    // Ocultamos el botón de 'Guardar' del formulario normal
-    // porque los ítems se guardan individualmente al hacer clic.
-    submitBtn.style.display = 'none';
-
-    let html = `<div class="checklist-container" style="display:flex; flex-direction:column; gap:8px; width:100%;">`;
-
-    // Ordenamos los ítems por el campo 'orden' antes de mostrar
-    const itemsOrdenados = [...instancia.items].sort((a, b) => a.orden - b.orden);
-
-    itemsOrdenados.forEach(item => {
-      html += `
-        <label class="checklist-row ${item.completado ? 'done' : ''}" id="item-row-${item.id}"
-               style="display:flex; align-items:center; gap:12px; padding:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
-          <input type="checkbox" ${item.completado ? 'checked' : ''}
-                 onchange="checklistsModule.toggleItem(${item.id}, this.checked)"
-                 style="width:18px; height:18px; accent-color:var(--accent);">
-          <span style="${item.completado ? 'text-decoration:line-through; opacity:0.6' : ''}">${item.texto}</span>
-        </label>`;
-    });
-
-    html += `</div>`;
-
-    fields.innerHTML = html;
-    document.getElementById('modal-overlay').classList.add('open');
-  },
-
-  /**
-   * Guarda el estado de un ítem en tiempo real.
-   */
-  toggleItem: async function(itemId, completado) {
-    try {
-      const res = await fetch(`${API_BASE}/checklists/instancias/items/${itemId}`, {  // antes: item_id (indefinido)
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ completado: completado })
-      });
-
-      if (res.ok) {
-        const row = document.getElementById(`item-row-${itemId}`);
-        const span = row.querySelector('span');
-        if (completado) {
-          row.classList.add('done');
-          span.style.textDecoration = 'line-through';
-          span.style.opacity = '0.6';
-        } else {
-          row.classList.remove('done');
-          span.style.textDecoration = 'none';
-          span.style.opacity = '1';
-        }
-      } else {
-        alert("El servidor rechazó el cambio. No se guardó.");
-      }
-    } catch (err) {
-      console.error("Error al guardar ítem:", err);
-      alert("No se pudo guardar el cambio. Verifique la conexión.");
-    }
-  }
+const checklistEndpoint = `${API_BASE}/checklists/instancias`;
+const formatChecklistDate = value => {
+ if (!value) return '—';
+ const parsed = new Date(`${value.slice(0,10)}T12:00:00`);
+ return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleDateString('es-CO');
 };
+async function checklistRequest(url, options = {}) {
+ const response = await fetch(url,{...options,headers:{'Content-Type':'application/json','Authorization':`Bearer ${getToken()}`,...(options.headers||{})}});
+ if(response.status===401){clearToken();showLogin();throw new Error('La sesión expiró.');}
+ if(!response.ok){const d=await response.json().catch(()=>({}));throw new Error(d.error||'No se pudo completar la operación.');}
+ return response.status===204?null:response.json();
+}
+function checklistIsAdmin(){try{const part=getToken().split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return ['admin','administrador'].includes(JSON.parse(atob(part.padEnd(Math.ceil(part.length/4)*4,'='))).rol?.toLowerCase());}catch(_){return false;}}
+const checklistsView={title:'Checklists',sub:'Mantenimientos programados y su progreso de ejecución.',endpoint:'/checklists/instancias',createFields:[],newLabel:'+ Nuevo checklist',openNew:()=>checklistsModule.openCreate(),render:async function(container){
+ container.innerHTML=`<section class="checklist-page"><div class="checklist-stats" id="checklist-stats"></div><div class="checklist-toolbar"><label class="checklist-search"><span class="material-symbols-outlined">search</span><input id="checklist-search" type="search" placeholder="Buscar activo, código, técnico o checklist"></label><select id="checklist-filter-activo"><option value="">Todos los activos</option></select><select id="checklist-filter-categoria"><option value="">Todas las categorías</option></select><select id="checklist-filter-estado"><option value="">Todos los estados</option><option>Pendiente</option><option>En progreso</option><option>Completado</option></select><input id="checklist-filter-fecha" type="date" aria-label="Filtrar por fecha"></div><div class="checklist-table-wrap" id="checklist-table"><div class="empty-state">Cargando checklists...</div></div></section>`;
+ try{const [rows,assets]=await Promise.all([checklistRequest(checklistEndpoint),checklistRequest(`${API_BASE}/activos/`)]);const search=container.querySelector('#checklist-search');const fs=['activo','categoria','estado','fecha'].map(k=>container.querySelector(`#checklist-filter-${k}`));const table=container.querySelector('#checklist-table');assets.forEach(a=>fs[0].insertAdjacentHTML('beforeend',`<option value="${a.id}">${escapeHtml(a.nombre)}</option>`));[...new Set(rows.map(r=>r.categoria).filter(Boolean))].sort().forEach(x=>fs[1].insertAdjacentHTML('beforeend',`<option>${escapeHtml(x)}</option>`));
+ const draw=()=>{container.querySelector('#checklist-stats').innerHTML=Object.entries({Total:rows.length,Completados:rows.filter(x=>x.estado==='Completado').length,'En progreso':rows.filter(x=>x.estado==='En progreso').length,Pendientes:rows.filter(x=>x.estado==='Pendiente').length}).map(([k,v])=>`<article class="checklist-stat"><span>${k}</span><strong>${v}</strong></article>`).join('');const q=search.value.trim().toLocaleLowerCase('es');const list=rows.filter(r=>{const a=r.activo||{},u=r.responsable||{};return[a.nombre,r.codigo_activo,r.tecnico,u.user,r.nombre].some(v=>String(v||'').toLocaleLowerCase('es').includes(q))&&(!fs[0].value||String(r.id_activo)===fs[0].value)&&(!fs[1].value||r.categoria===fs[1].value)&&(!fs[2].value||r.estado===fs[2].value)&&(!fs[3].value||r.fecha_programada===fs[3].value)});if(!list.length){table.innerHTML=`<div class="templates-empty"><span class="material-symbols-outlined">fact_check</span><strong>${rows.length?'No hay resultados con estos filtros':'Aún no hay checklists'}</strong><span>${rows.length?'Ajusta la búsqueda o los filtros.':'Crea un checklist o utiliza una plantilla.'}</span></div>`;return;}table.innerHTML=`<table class="data-table"><thead><tr><th>Activo</th><th>Código</th><th>Categoría</th><th>Técnico</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${list.map(r=>`<tr><td><strong>${escapeHtml(r.activo?.nombre||'Activo')}</strong><small class="checklist-secondary">${escapeHtml(r.nombre)}</small></td><td>${escapeHtml(r.codigo_activo||'—')}</td><td>${escapeHtml(r.categoria||'—')}</td><td>${escapeHtml(r.tecnico||r.responsable?.user||'—')}</td><td><span class="badge ${r.estado==='Completado'?'on':r.estado==='En progreso'?'warning':'neutral'}">${escapeHtml(r.estado)}</span></td><td>${escapeHtml(formatChecklistDate(r.fecha_programada))}</td><td><div class="checklist-actions"><button class="btn-secondary" onclick="checklistsModule.openDetail(${r.id})">Ver</button><details class="action-menu"><summary aria-label="Más acciones">⋯</summary><div><button onclick="checklistsModule.openEdit(${r.id},false)">Editar</button><button onclick="checklistsModule.openEdit(${r.id},true)">Reasignar técnico</button>${checklistIsAdmin()?`<button class="danger-action" onclick="checklistsModule.remove(${r.id})">Eliminar</button>`:''}</div></details></div></td></tr>`).join('')}</tbody></table>`;};search.addEventListener('input',draw);fs.forEach(f=>f.addEventListener('change',draw));draw();}catch(e){container.querySelector('#checklist-table').innerHTML=`<div class="empty-state">${escapeHtml(e.message)}</div>`;}
+}};
+const checklistsModule={
+ loadFormOptions:async function(){const[a,u,t]=await Promise.all([checklistRequest(`${API_BASE}/activos/`),checklistRequest(`${API_BASE}/usuarios/`),checklistRequest(`${API_BASE}/checklists/plantillas`)]);return{assets:a.filter(x=>x.estado!==false),users:u.filter(x=>String(x.rol).toLowerCase()==='técnico'&&x.activo!==false),templates:t};},
+ openCreate:async function(template=null){
+  try {
+   const {assets,users,templates}=await this.loadFormOptions();
+   if(!assets.length||!users.length)throw new Error('Registra al menos un activo y un usuario con rol Técnico.');
+   const assetOptions=assets.map(a=>`<option value="${a.id}">${escapeHtml(a.nombre)} · ${escapeHtml(a.placa||a.serial||'Sin código')}</option>`).join('');
+   const userOptions=users.map(u=>`<option value="${u.id}">${escapeHtml(u.user)}</option>`).join('');
+   const templateOptions=templates.map(t=>`<option value="${t.id}" ${template?.id===t.id?'selected':''}>${escapeHtml(t.nombre)} (${t.items?.length||0} puntos)</option>`).join('');
+   const preview=t=>t?`<section class="template-included-panel" aria-label="Puntos incluidos en la plantilla"><header class="template-included-heading"><span class="material-symbols-outlined" aria-hidden="true">fact_check</span><div><strong>Puntos incluidos</strong><small>${t.items?.length||0} puntos de revisión</small></div></header><ol class="template-included-list">${(t.items||[]).map((item,index)=>`<li class="template-included-item"><span class="template-included-index">${String(index+1).padStart(2,'0')}</span><span class="template-included-text">${escapeHtml(item.texto)}</span><span class="material-symbols-outlined template-included-check" aria-hidden="true">check</span></li>`).join('')||'<li class="template-included-empty">Esta plantilla no tiene puntos configurados.</li>'}</ol></section>`:'';
+   openCustomModal(template?'Usar plantilla':'Nuevo checklist',`<div class="field full"><label for="check-template">Plantilla</label><select id="check-template"><option value="">Sin plantilla</option>${templateOptions}</select></div><div class="field full"><label for="check-asset">Activo</label><select id="check-asset" required>${assetOptions}</select></div><div class="field"><label for="check-user">Técnico responsable</label><select id="check-user" required>${userOptions}</select></div><div class="field"><label for="check-date">Fecha</label><input id="check-date" type="date" required value="${new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota'}).format(new Date())}"></div><div class="field full"><label for="check-notes">Observaciones iniciales</label><textarea id="check-notes" rows="3"></textarea></div><div id="check-template-preview">${preview(template)}</div><div class="field full" id="manual-items-wrap" ${template?'style="display:none"':''}><label for="check-manual-items">Puntos manuales (uno por línea)</label><textarea id="check-manual-items" rows="5" placeholder="Escribe un punto de revisión por línea"></textarea></div>`,async()=>{
+    const templateId=document.getElementById('check-template').value;
+    const assetId=document.getElementById('check-asset').value;
+    const asset=assets.find(x=>String(x.id)===assetId);
+    const selected=templates.find(x=>String(x.id)===templateId);
+    const manualItems=document.getElementById('check-manual-items').value.split(/\r?\n/).map(text=>text.trim()).filter(Boolean).map((texto,orden)=>({texto,orden:orden+1}));
+    if(!selected&&!manualItems.length)throw new Error('Selecciona una plantilla o agrega al menos un punto de revisión.');
+    const created=await checklistRequest(checklistEndpoint,{method:'POST',body:JSON.stringify({id_plantilla:templateId?Number(templateId):null,id_activo:Number(assetId),id_usuario:Number(document.getElementById('check-user').value),fecha_programada:document.getElementById('check-date').value,observaciones:document.getElementById('check-notes').value,nombre:selected?`${selected.nombre} - ${asset.nombre}`:`Checklist - ${asset.nombre}`,items:selected?undefined:manualItems})});
+    closeModal();await loadView('checklists');if(template&&created?.id)this.openDetail(created.id);
+   });
+   document.getElementById('check-template').addEventListener('change',event=>{const selected=templates.find(x=>String(x.id)===event.target.value);document.getElementById('check-template-preview').innerHTML=preview(selected);document.getElementById('manual-items-wrap').style.display=selected?'none':'grid';});
+  }catch(error){alert(error.message);}
+ },
+ openEdit:async function(id,assignOnly){try{const[row,options]=await Promise.all([checklistRequest(`${checklistEndpoint}/${id}`),this.loadFormOptions()]);const opts=options.users.map(u=>`<option value="${u.id}" ${Number(row.id_usuario)===Number(u.id)?'selected':''}>${escapeHtml(u.user)}</option>`).join(''),assets=options.assets.map(a=>`<option value="${a.id}" ${Number(row.id_activo)===Number(a.id)?'selected':''}>${escapeHtml(a.nombre)}</option>`).join('');openCustomModal(assignOnly?'Reasignar técnico':'Editar checklist',`<div class="field full"><label for="edit-tech">Técnico responsable</label><select id="edit-tech" required>${opts}</select></div>${assignOnly?'':`<div class="field full"><label for="edit-name">Nombre del checklist</label><input id="edit-name" value="${escapeHtml(row.nombre)}" required></div><div class="field full"><label for="edit-asset">Activo</label><select id="edit-asset" required>${assets}</select></div><div class="field"><label for="edit-date">Fecha</label><input id="edit-date" type="date" value="${row.fecha_programada||''}" required></div><div class="field full"><label for="edit-notes">Observaciones</label><textarea id="edit-notes" rows="3">${escapeHtml(row.observaciones||'')}</textarea></div>`}`,async()=>{const p={id_usuario:Number(document.getElementById('edit-tech').value)};if(!assignOnly){p.nombre=document.getElementById('edit-name').value.trim();p.id_activo=Number(document.getElementById('edit-asset').value);p.fecha_programada=document.getElementById('edit-date').value;p.observaciones=document.getElementById('edit-notes').value;}await checklistRequest(`${checklistEndpoint}/${id}`,{method:'PATCH',body:JSON.stringify(p)});closeModal();loadView('checklists');});}catch(e){alert(e.message);}},
+ openDetail:async function(id){try{const r=await checklistRequest(`${checklistEndpoint}/${id}`),items=[...(r.items||[])].sort((a,b)=>a.orden-b.orden);openCustomModal(`Checklist · ${r.nombre}`,`<div class="checklist-detail-meta"><div><small>Activo</small><strong>${escapeHtml(r.activo?.nombre||'—')}</strong><span>${escapeHtml(r.codigo_activo||'')} · ${escapeHtml(r.activo?.categoria_tipo||'')}</span></div><div><small>Técnico</small><strong>${escapeHtml(r.tecnico||r.responsable?.user||'—')}</strong></div><div><small>Fecha y estado</small><strong>${escapeHtml(formatChecklistDate(r.fecha_programada))}</strong><span class="badge ${r.estado==='Completado'?'on':r.estado==='En progreso'?'warning':'neutral'}">${escapeHtml(r.estado)}</span></div></div><div class="field full"><label>Checklist</label><strong>${escapeHtml(r.nombre)}</strong></div><div class="field full"><label>Puntos de revisión (${items.length})</label><div class="checklist-container">${items.length?items.map(i=>`<div class="checklist-row ${i.completado?'done':''}"><input type="checkbox" ${i.completado?'checked':''} aria-label="Marcar ${escapeHtml(i.texto)}" onchange="checklistsModule.toggleItem(${i.id},this.checked,${id})"><span>${escapeHtml(i.texto)}</span><textarea rows="2" placeholder="Observaciones del punto" onchange="checklistsModule.saveItemNote(${i.id},this.value)">${escapeHtml(i.observaciones||'')}</textarea></div>`).join(''):'<p>Este checklist no tiene puntos de revisión.</p>'}</div></div><div class="field full"><label>Observaciones generales</label><p>${escapeHtml(r.observaciones||'Sin observaciones')}</p></div>`,null,'Cerrar');}catch(e){alert(e.message);}},
+ toggleItem:async function(itemId,done,id){try{await checklistRequest(`${API_BASE}/checklists/instancias/items/${itemId}`,{method:'PATCH',body:JSON.stringify({completado:done})});await loadView('checklists');await this.openDetail(id);}catch(e){alert(e.message);}},
+ saveItemNote:async function(id,note){try{await checklistRequest(`${API_BASE}/checklists/instancias/items/${id}`,{method:'PATCH',body:JSON.stringify({observaciones:note})});}catch(e){alert(e.message);}},
+ remove:async function(id){if(!checklistIsAdmin()||!confirm('¿Eliminar este checklist y todos sus resultados?'))return;try{await checklistRequest(`${checklistEndpoint}/${id}`,{method:'DELETE'});loadView('checklists');}catch(e){alert(e.message);}},
+ iniciarAutomatico:async function(tareaId,perfil,mantenimiento){try{const url=API_BASE+'/checklists/plantillas/buscar-match?perfil='+encodeURIComponent(perfil)+'&mantenimiento='+encodeURIComponent(mantenimiento);const template=await checklistRequest(url);const created=await checklistRequest(checklistEndpoint,{method:'POST',body:JSON.stringify({id_tarea:tareaId,id_plantilla:template.id})});setTimeout(()=>this.openDetail(created.id),350);}catch(e){console.warn('No se pudo generar el checklist automático:',e.message);}},
+ abrirParaTarea:async function(tareaId){try{const rows=await checklistRequest(`${API_BASE}/checklists/tareas/${tareaId}/instancias`);if(!rows.length){alert('Esta tarea todavía no tiene un checklist.');return;}this.openDetail(rows[0].id);}catch(e){alert(e.message);}}
+};
+window.checklistsModule = checklistsModule;

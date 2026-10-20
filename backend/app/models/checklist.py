@@ -152,9 +152,14 @@ class ChecklistInstancia(db.Model):
     id_tarea = db.Column(
         db.Integer,
         db.ForeignKey("tareas.id"),
-        nullable=False,
+        nullable=True,
         index=True
     )
+
+    id_activo = db.Column(db.Integer, db.ForeignKey("activos.id"), nullable=True, index=True)
+    id_usuario = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=True, index=True)
+    fecha_programada = db.Column(db.Date, nullable=True, index=True)
+    observaciones = db.Column(db.String(2000), nullable=True)
 
     id_plantilla = db.Column(
         db.Integer,
@@ -179,6 +184,9 @@ class ChecklistInstancia(db.Model):
         foreign_keys=[id_tarea]
     )
 
+    activo = db.relationship("Activo", foreign_keys=[id_activo])
+    responsable = db.relationship("Usuario", foreign_keys=[id_usuario])
+
     plantilla = db.relationship(
         "ChecklistPlantilla",
         foreign_keys=[id_plantilla]
@@ -192,9 +200,22 @@ class ChecklistInstancia(db.Model):
     )
 
     def to_dict(self):
+        items = list(self.items)
+        estado = (
+            "Pendiente" if not items or not any(item.completado for item in items)
+            else "Completado" if all(item.completado for item in items)
+            else "En progreso"
+        )
         return {
             "id": self.id,
             "id_tarea": self.id_tarea,
+            "id_activo": self.id_activo or (self.tarea.id_activo if self.tarea else None),
+            "activo": self.activo.to_dict() if self.activo else (self.tarea.activo.to_dict() if self.tarea and self.tarea.activo else None),
+            "id_usuario": self.id_usuario or (self.tarea.id_usuario if self.tarea else None),
+            "responsable": self.responsable.to_dict() if self.responsable else (self.tarea.usuario.to_dict() if self.tarea and self.tarea.usuario else None),
+            "fecha_programada": self.fecha_programada.isoformat() if self.fecha_programada else None,
+            "estado": estado,
+            "observaciones": self.observaciones,
             "id_plantilla": self.id_plantilla,
             "nombre": self.nombre,
             "creado_en": (

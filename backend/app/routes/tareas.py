@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import joinedload
 
 from database import db
-from app.models import Tarea, Activo, Usuario, ChecklistInstancia
+from app.models import Tarea, Activo, Usuario, ChecklistInstancia, Plantilla
 
 tareas_bp = Blueprint(
     "tareas",
@@ -153,6 +153,13 @@ def actualizar_tarea(id):
 @tareas_bp.route("/<int:id>", methods=["DELETE"])
 def eliminar_tarea(id):
     tarea = Tarea.query.get_or_404(id)
+    # Conserva el historial de checklists y elimina solo el vínculo con la tarea.
+    ChecklistInstancia.query.filter_by(id_tarea=id).update(
+        {ChecklistInstancia.id_tarea: None}, synchronize_session=False
+    )
+    Plantilla.query.filter_by(id_tareas=id).update(
+        {Plantilla.id_tareas: None}, synchronize_session=False
+    )
     db.session.delete(tarea)
     db.session.commit()
 

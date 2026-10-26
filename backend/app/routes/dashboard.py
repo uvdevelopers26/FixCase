@@ -1,7 +1,7 @@
 import logging
 
 from flask import Blueprint, jsonify
-from sqlalchemy import func
+from sqlalchemy import func, true
 
 from database import db
 from app.models.tarea import Tarea
@@ -60,9 +60,11 @@ def resumen():
             db.session.query(func.count(Usuario.id)).scalar() or 0
         )
 
+        # true() se traduce a "= 1" en SQL Server y a "= true" en MySQL.
+        # Usuario.activo.is_(True) puede generar "IS 1", que T-SQL no acepta.
         usuarios_activos = (
             db.session.query(func.count(Usuario.id))
-            .filter(Usuario.activo.is_(True))
+            .filter(Usuario.activo == true())
             .scalar() or 0
         )
 

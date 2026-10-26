@@ -47,6 +47,98 @@ const tareasView = {
     }
   ],
 
+  render: async function(container) {
+    container.innerHTML = '<div class="empty-state">Cargando tareas...</div>';
+    try {
+      const tareas = await tareasView.request(`${API_BASE}${tareasView.endpoint}`);
+      const columns = [...tareasView.columns, {
+        key: 'id',
+        label: 'Acciones',
+        render: (id) => `<div class="task-row-actions"><button type="button" class="btn-secondary" data-task-action="edit" data-task-id="${Number(id)}">Editar</button><button type="button" class="btn-secondary task-delete" data-task-action="delete" data-task-id="${Number(id)}">Eliminar</button></div>`
+      }];
+      container.innerHTML = renderTable(tareas, columns);
+      container.querySelectorAll('[data-task-action="edit"]').forEach(button => {
+        button.addEventListener('click', () => tareasView.edit(button.dataset.taskId));
+      });
+      container.querySelectorAll('[data-task-action="delete"]').forEach(button => {
+        button.addEventListener('click', () => tareasView.remove(button.dataset.taskId));
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="empty-state">No se pudieron cargar las tareas: ${escapeHtml(e.message)}</div>`;
+    }
+  },
+
+  request: async function(url, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        Authorization: `Bearer ${getToken()}`,
+        ...(options.headers || {})
+      }
+    });
+    if (response.status === 401) {
+      clearToken();
+      showLogin();
+      throw new Error('La sesión expiró.');
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'No se pudo completar la acción.');
+    }
+    return response.status === 204 ? null : response.json();
+  },
+
+  edit: async function(id) {
+    try {
+      const [tarea, activos, usuarios] = await Promise.all([
+        tareasView.request(`${API_BASE}${tareasView.endpoint}${id}`),
+        tareasView.request(`${API_BASE}/activos/`),
+        tareasView.request(`${API_BASE}/usuarios/`)
+      ]);
+      const selectOptions = (rows, key, current, label) => rows.map(row =>
+        `<option value="${escapeHtml(row[key])}" ${String(row[key]) === String(current) ? 'selected' : ''}>${escapeHtml(label(row))}</option>`
+      ).join('');
+      const taskOptions = (values, current) => {
+        const choices = values.includes(current) ? values : [...values, ...(current ? [current] : [])];
+        return choices.map(value => `<option value="${escapeHtml(value)}" ${value === current ? 'selected' : ''}>${escapeHtml(value.replace('_', ' '))}</option>`).join('');
+      };
+      const activeUsers = usuarios.filter(user => user.activo !== false);
+      const assetOptions = selectOptions(activos, 'id', tarea.id_activo, asset => `${asset.nombre} (${asset.serial || 'S/N'})`);
+      const userOptions = selectOptions(activeUsers, 'id', tarea.id_usuario, user => user.user);
+      openCustomModal('Editar tarea', `<div class="task-edit-form">
+        <div class="field"><label for="task-edit-asset">Equipo</label><select id="task-edit-asset" required>${assetOptions}</select></div>
+        <div class="field"><label for="task-edit-user">Técnico responsable</label><select id="task-edit-user" required>${userOptions}</select></div>
+        <div class="field"><label for="task-edit-work">Tipo de trabajo</label><select id="task-edit-work" required>${taskOptions(['Preventivo', 'Correctivo', 'Reinstalacion'], tarea.tipo_trabajo)}</select></div>
+        <div class="field"><label for="task-edit-priority">Prioridad</label><select id="task-edit-priority">${taskOptions(['baja', 'media', 'alta'], tarea.prioridad || 'media')}</select></div>
+        <div class="field"><label for="task-edit-status">Estado</label><select id="task-edit-status">${taskOptions(['pendiente', 'en_proceso', 'completado', 'cancelado'], tarea.id_estado || 'pendiente')}</select></div>
+        <div class="field"><label for="task-edit-date">Fecha programada</label><input id="task-edit-date" type="date" value="${escapeHtml(tarea.fecha_programada || '')}"></div>
+        <div class="field full"><label for="task-edit-description">Descripción / observaciones</label><textarea id="task-edit-description" rows="4">${escapeHtml(tarea.descripcion || '')}</textarea></div>
+      </div>`, async () => {
+        const payload = {
+          id_activo: Number(document.getElementById('task-edit-asset').value),
+          id_usuario: Number(document.getElementById('task-edit-user').value),
+          tipo_trabajo: document.getElementById('task-edit-work').value,
+          prioridad: document.getElementById('task-edit-priority').value,
+          id_estado: document.getElementById('task-edit-status').value,
+          fecha_programada: document.getElementById('task-edit-date').value || null,
+          descripcion: document.getElementById('task-edit-description').value.trim() || null
+        };
+        await tareasView.request(`${API_BASE}${tareasView.endpoint}${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+        closeModal();
+        loadView('tareas');
+      }, 'Guardar cambios');
+    } catch (e) { alert(e.message); }
+  },
+
+  remove: async function(id) {
+    if (!confirm('¿Eliminar esta tarea? Los checklists y plantillas vinculados se conservarán, pero quedarán desvinculados.')) return;
+    try {
+      await tareasView.request(`${API_BASE}${tareasView.endpoint}${id}`, { method: 'DELETE' });
+      loadView('tareas');
+    } catch (e) { alert(e.message); }
+  },
+
   createFields: [
     {
       key: 'asunto_grupo',

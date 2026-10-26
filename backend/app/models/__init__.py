@@ -2,6 +2,7 @@ from .base import BaseModel
 
 from .usuario import Usuario
 from .activo import Activo
+from .catalogo import Categoria, Marca, Area, Sede, Puesto
 from .tarea import Tarea
 from .plantilla import Plantilla
 from .dhv import DHV

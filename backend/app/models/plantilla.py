@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from database import db
 from .base import BaseModel
 
@@ -49,6 +51,19 @@ class Plantilla(BaseModel):
     version = db.Column(
         db.Integer,
         default=1,
+        nullable=False,
+    )
+
+    creado_en = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    actualizado_en = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
         nullable=False,
     )
 

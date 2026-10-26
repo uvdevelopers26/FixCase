@@ -132,15 +132,24 @@ const plantillasModule = {
   view: async function (id) {
     try {
       const t = await checklistRequest(`${API_BASE}/checklists/plantillas/${id}`);
+      const items = t.items || [];
       openCustomModal(
         t.nombre,
-        `<p>${escapeHtml(t.descripcion || 'Sin descripción')}</p>
-         <p>
-           <span class="badge neutral">${escapeHtml(plantillaEtiqueta(PLANTILLA_MANTENIMIENTOS, t.categoria_mantenimiento) || 'Sin tipo')}</span>
-           <span class="badge neutral">${escapeHtml(plantillaEtiqueta(PLANTILLA_PERFILES, t.perfil_activo) || 'Sin perfil')}</span>
-           ${t.estado === false ? '<span class="badge warning">Inactiva</span>' : ''}
-         </p>
-         <ol class="template-preview">${(t.items || []).map(i => `<li>${escapeHtml(i.texto)}</li>`).join('') || '<li>Sin puntos</li>'}</ol>`,
+        `<div class="template-view">
+           <section class="template-view-summary">
+             <div class="template-view-icon"><span class="material-symbols-outlined">fact_check</span></div>
+             <div class="template-view-intro"><span class="template-view-eyebrow">Plantilla de checklist</span><p>${escapeHtml(t.descripcion || 'Esta plantilla organiza los puntos de revisión para realizar el mantenimiento.')}</p></div>
+           </section>
+           <section class="template-view-meta" aria-label="Detalles de la plantilla">
+             <div class="template-view-meta-item"><span class="material-symbols-outlined">build</span><div><small>Tipo de mantenimiento</small><strong>${escapeHtml(plantillaEtiqueta(PLANTILLA_MANTENIMIENTOS, t.categoria_mantenimiento) || 'Sin tipo')}</strong></div></div>
+             <div class="template-view-meta-item"><span class="material-symbols-outlined">category</span><div><small>Perfil de activo</small><strong>${escapeHtml(plantillaEtiqueta(PLANTILLA_PERFILES, t.perfil_activo) || 'Sin perfil')}</strong></div></div>
+             <div class="template-view-meta-item"><span class="material-symbols-outlined">${t.estado === false ? 'pause_circle' : 'check_circle'}</span><div><small>Estado</small><strong>${t.estado === false ? 'Inactiva' : 'Activa'}</strong></div></div>
+           </section>
+           <section class="template-view-points">
+             <div class="template-view-points-heading"><div><span class="template-view-eyebrow">Contenido</span><h4>Puntos de revisión</h4></div><span class="template-view-count">${items.length} ${items.length === 1 ? 'punto' : 'puntos'}</span></div>
+             ${items.length ? `<ol class="template-view-list">${items.map((item, index) => `<li><span class="template-view-number">${String(index + 1).padStart(2, '0')}</span><span class="template-view-point-text">${escapeHtml(item.texto)}</span><span class="material-symbols-outlined template-view-point-icon">task_alt</span></li>`).join('')}</ol>` : '<div class="template-view-empty"><span class="material-symbols-outlined">playlist_add</span><span>Esta plantilla todavía no tiene puntos de revisión.</span></div>'}
+           </section>
+         </div>`,
         null,
         'Cerrar'
       );
@@ -224,8 +233,11 @@ const plantillasModule = {
            <label for="template-description">Descripción</label>
            <textarea id="template-description" rows="3">${escapeHtml(t.descripcion || '')}</textarea>
          </div>
-         <div class="field full">
-           <label><input type="checkbox" id="template-active" ${t.estado === false ? '' : 'checked'}> Plantilla activa (solo las activas se usan al crear tareas)</label>
+         <div class="field full template-active-field">
+           <label class="template-active-toggle" for="template-active">
+             <span class="template-active-copy"><strong>Plantilla activa</strong><small>Solo las activas se usan al crear tareas.</small></span>
+             <input type="checkbox" id="template-active" ${t.estado === false ? '' : 'checked'}>
+           </label>
          </div>
          <div class="field full">
            <label>Puntos de revisión</label>${drawItems()}

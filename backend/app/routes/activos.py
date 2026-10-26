@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from database import db
-from app.models import Activo
+from app.models import Activo, Categoria, Marca, Area, Sede, Puesto
 
 
 activos_bp = Blueprint(
@@ -24,6 +24,64 @@ def get_activos():
         activo.to_dict()
         for activo in activos
     ])
+
+
+# ==========================================================
+# OPCIONES PARA LOS CAMPOS DEL FORMULARIO
+# GET /api/activos/opciones
+#
+# Devuelve los valores de los catálogos (solo los activos) para
+# los selects de categoría, marca, área, sede y puesto.
+# Si un catálogo no se puede leer (por ejemplo, la tabla aún no
+# existe), se usan como respaldo los valores ya registrados en
+# la tabla de activos.
+# ==========================================================
+
+def _valores_distintos(columna):
+    """Valores únicos de una columna de activos: sin vacíos ni 'N/A',
+    sin repetir por mayúsculas/minúsculas y ordenados alfabéticamente."""
+    filas = (
+        db.session.query(columna)
+        .filter(columna.isnot(None))
+        .distinct()
+        .all()
+    )
+
+    vistos = {}
+    for (valor,) in filas:
+        valor = (valor or "").strip()
+        if valor and valor.upper() != "N/A":
+            vistos.setdefault(valor.upper(), valor)
+
+    return sorted(vistos.values(), key=str.lower)
+
+
+def _valores_catalogo(Modelo, columna_activo):
+    """Nombres activos de un catálogo; si falla, usa los valores
+    distintos que ya existen en la tabla de activos."""
+    try:
+        filas = (
+            db.session.query(Modelo.nombre)
+            .filter(Modelo.activo.is_(True))
+            .order_by(Modelo.nombre)
+            .all()
+        )
+        return [nombre for (nombre,) in filas]
+    except Exception:
+        db.session.rollback()
+        return _valores_distintos(columna_activo)
+
+
+@activos_bp.route("/opciones", methods=["GET"])
+def opciones_activos():
+
+    return jsonify({
+        "categoria_tipo": _valores_catalogo(Categoria, Activo.categoria_tipo),
+        "marca": _valores_catalogo(Marca, Activo.marca),
+        "area": _valores_catalogo(Area, Activo.area),
+        "sede": _valores_catalogo(Sede, Activo.sede),
+        "puesto": _valores_catalogo(Puesto, Activo.puesto),
+    })
 
 
 # ==========================================================
@@ -97,8 +155,14 @@ def crear_activo():
         asunto=data.get("asunto")
     )
 
-    db.session.add(nuevo)
-    db.session.commit()
+    try:
+        db.session.add(nuevo)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": f"No se pudo crear el activo: {e}"
+        }), 500
 
     return jsonify(
         nuevo.to_dict()
@@ -114,7 +178,7 @@ def actualizar_activo(id):
 
     activo = Activo.query.get_or_404(id)
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     campos = [
         "nombre",
@@ -155,7 +219,13 @@ def actualizar_activo(id):
                 data[campo]
             )
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": f"No se pudo actualizar el activo: {e}"
+        }), 500
 
     return jsonify(
         activo.to_dict()
